@@ -70,27 +70,31 @@ class MQTT_Broker(object):
         client.subscribe("zigate/command/#")
 
     def on_message(self, client, userdata, msg):
-        payload = {}
-        if msg.payload:
-            payload = json.loads(msg.payload.decode())
         if msg.topic == 'zigate/command':
+            payload = {}
+            if msg.payload:
+                payload = json.loads(msg.payload.decode())
+
             func_name = payload.get('function')
             args = payload.get('args', [])
             if hasattr(self.zigate, func_name):
                 func = getattr(self.zigate, func_name)
+                error = None
                 if callable(func):
                     try:
                         result = func(*args)
-                    except Exception:
+                    except Exception as err:
                         result = None
+                        error = 'Error calling function {} with the following error : {}'.format(func_name, err)
                         logging.error('Error calling function {}'.format(func_name))
                 else:
                     result = func
-                if result:
-                    self._publish('zigate/command/result',
-                                  {'function': func_name,
-                                   'result': result
-                                   })
+
+                self._publish('zigate/command/result',
+                              {'function': func_name,
+                               'result': result,
+                               'error': error
+                               })
             else:
                 logging.error('ZiGate has no function named {}'.format(func_name))
 
